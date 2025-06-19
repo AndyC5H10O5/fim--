@@ -19,6 +19,8 @@ import {
 import { parseFile } from "./context/codeCST";
 import { cstCache, HISTORY } from "../shared/cst";
 import { RequestApi } from "./request/request";
+import { Comp } from "./panel/completion";
+import { ModelPanel } from "./panel/ModelPanel";
 
 interface AnyFunc {
   (): void;
@@ -38,7 +40,12 @@ class ControllSession {
   /** 补全结果 -- 包含当前行
    * @example completions[completionIndex] = prefixOnCursor + completion
    */
-  completions: string[] = [`\nprint("hello world")`];
+  completions: string[] = [
+    `\nprint("000000000")`,
+    `\nprint("111111111")`,
+    `\nprint("222222222")`,
+  ];
+  modelCompletions: Map<string, string[]> = new Map();
 
   /**
    * 获取上下文
@@ -104,6 +111,24 @@ class ControllSession {
     return this;
   }
 
+  updateModelCompletions(modelId: string, completions: string[]) {
+    console.log("更新模型补全结果...");
+
+    this.modelCompletions.set(modelId, completions);
+    // 只更新结果，不自动显示
+    if (ConfigManager.getWebviewOpened()) {
+      const completions = this.modelCompletions.get(modelId);
+      if (completions) {
+        ModelPanel.createOrShow(modelId, completions, (index: number) => {
+          Comp.Index = index; // 更新全局Index
+          // 可以在这里添加其他需要的处理逻辑
+          console.log(`Selected completion index2: ${Comp.Index}`);
+          vscode.commands.executeCommand("editor.action.inlineSuggest.trigger");
+        });
+      }
+    }
+  }
+
   /**
    * 请求API接口
    *
@@ -114,15 +139,16 @@ class ControllSession {
   async requestApi(
     hasher: Hasher,
     cache: Cache<DefaultCacheType>,
-    requestApi: RequestApi,
+    requestApi: RequestApi
   ) {
     // 已有结果 or 被取消，则返回
     if (this.completionIndex !== -1 || this.cancel) {
       return;
     }
+
     let res = await requestApi.request(
       this.ctx,
-      ConfigManager.getWebviewOpened(),
+      ConfigManager.getWebviewOpened()
     );
 
     if (res && res.length > 0) {
@@ -132,7 +158,7 @@ class ControllSession {
           if (!r.data) {
             vscode.window.showInformationMessage(
               r.api,
-              "发生了一个错误，请查看日志获取详细信息",
+              "发生了一个错误，请查看日志获取详细信息"
             );
           }
           return r.data;
@@ -149,7 +175,7 @@ class ControllSession {
       const cacheData = cache.get(this.hashKey);
       // 为了方便后续计算缓存是否命中，添加当前行的前缀
       const completionsTmp = this.completions.map(
-        (c) => this.ctx.prefixOnCursor + c,
+        (c) => this.ctx.prefixOnCursor + c
       );
       if (cacheData && cacheData?.completions.length > 0) {
         cacheData.completions.push(...completionsTmp);
@@ -183,14 +209,14 @@ export class FIMProvider implements vscode.InlineCompletionItemProvider {
     this.hasher = new Hasher(RAW_SNIPPET);
     this.requestApi = new RequestApi(
       ConfigManager.getAPIs(),
-      ConfigManager.getRLCoderConfig(),
+      ConfigManager.getRLCoderConfig()
     );
   }
   public async provideInlineCompletionItems(
     document: vscode.TextDocument,
     position: vscode.Position,
     context: vscode.InlineCompletionContext,
-    token: vscode.CancellationToken,
+    token: vscode.CancellationToken
     //@ts-ignore
   ): ProviderResult<InlineCompletionItem[] | InlineCompletionList> {
     if (context.triggerKind === vscode.InlineCompletionTriggerKind.Automatic) {
@@ -201,7 +227,23 @@ export class FIMProvider implements vscode.InlineCompletionItemProvider {
       return;
     }
 
+    const isOpened = ConfigManager.getWebviewOpened();
+
     const session = new ControllSession();
+    if (isOpened) {
+      // 模拟多个模型的补全结果
+      session.updateModelCompletions("RLCoder", session.completions);
+      console.log(`得到补全结果索引: ${Comp.Index}`);
+      session.completionIndex = Comp.Index;
+      return Comp.comps.map(
+        (comp) =>
+          new vscode.InlineCompletionItem(
+            comp,
+            new vscode.Range(position, position)
+          )
+      );
+    }
+
     session
       .getCtx(document, position)
       .getCST(document)
@@ -216,7 +258,7 @@ export class FIMProvider implements vscode.InlineCompletionItemProvider {
     if (completion) {
       StatusManager.addTotalItem();
       const endPosition = document.positionAt(
-        document.offsetAt(position) + completion.length,
+        document.offsetAt(position) + completion.length
       );
       const range = new vscode.Range(position, endPosition);
       return [new vscode.InlineCompletionItem(completion, range, this.cmd)];

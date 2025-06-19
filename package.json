@@ -25,6 +25,23 @@
         "command": "fim--.showMoreResults",
         "key": "ctrl+shift+m",
         "when": "!fim--.webviewOpened"
+      },
+      {
+        "command": "fim--.toggleWebview",
+        "key": "ctrl+shift+z",
+        "mac": "cmd+shift+a"
+      },
+      {
+        "command": "fim--.selectPreviousCompletion",
+        "key": "ctrl+up",
+        "mac": "cmd+up",
+        "when": "editorTextFocus && fim--.webviewOpened"
+      },
+      {
+        "command": "fim--.selectNextCompletion",
+        "key": "ctrl+down",
+        "mac": "cmd+down",
+        "when": "editorTextFocus && fim--.webviewOpened"
       }
     ],
     "inlineCompletions": {

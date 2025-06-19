@@ -4,6 +4,7 @@ import { ConfigManager } from "./config/ConfigManager";
 import { cstCache, HISTORY } from "./shared/cst";
 import { patch } from "axios";
 import { parseFile } from "./core/context/codeCST";
+import { ModelPanel } from "./core/panel/ModelPanel";
 import { StatusManager } from "./core/status/StatusManager";
 //import { getParserForFile } from "./core/context/codeCST";
 
@@ -93,7 +94,44 @@ export function activate(context: vscode.ExtensionContext) {
         console.log(ConfigManager.getWebviewOpened());
       }, 1000);
       vscode.window.showInformationMessage("您执行了extension.sayHello命令！");
+      ModelPanel.createOrShow("current", ["请先触发代码补全..."]);
     },
+  );
+
+    // 注册切换 webview 的命令
+  const toggleWebview = vscode.commands.registerCommand(
+    "fim--.toggleWebview",
+    () => {
+      const isOpened = ConfigManager.getWebviewOpened();
+      if (isOpened) {
+        ModelPanel.hide();
+      } else {
+        // 如果没有当前补全结果，显示一个欢迎信息
+        ModelPanel.createOrShow("welcome", [
+          "欢迎使用 AI Completions！",
+          "当您触发代码补全时，补全结果将会显示在这里。",
+          "您可以使用快捷键 Ctrl+Shift+A (Mac: Cmd+Shift+A) 或点击编辑器右上角的按钮来切换此面板。"
+        ]);
+      }
+    }
+  );
+
+  // 注册选择上一个补全项的命令
+  const selectPreviousCompletion = vscode.commands.registerCommand(
+    "fim--.selectPreviousCompletion",
+    () => {
+      ModelPanel.selectPreviousCompletion();
+      vscode.commands.executeCommand("editor.action.inlineSuggest.showPrevious");
+    }
+  );
+
+  // 注册选择下一个补全项的命令
+  const selectNextCompletion = vscode.commands.registerCommand(
+    "fim--.selectNextCompletion",
+    () => {
+      ModelPanel.selectNextCompletion();
+      vscode.commands.executeCommand("editor.action.inlineSuggest.showNext");
+    }
   );
 
   context.subscriptions.push(
@@ -103,6 +141,9 @@ export function activate(context: vscode.ExtensionContext) {
     onWillDeleteFiles,
     showMoreResults,
     onCompeletionAccepted,
+    toggleWebview,
+    selectPreviousCompletion,
+    selectNextCompletion
   );
 }
 
